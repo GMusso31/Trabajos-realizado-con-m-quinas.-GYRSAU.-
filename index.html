@@ -1,0 +1,953 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <link rel="stylesheet" href="css/leaflet.css">
+        <link rel="stylesheet" href="css/L.Control.Layers.Tree.css">
+        <link rel="stylesheet" href="css/qgis2web.css">
+        <link rel="stylesheet" href="css/fontawesome-all.min.css">
+        <link rel="stylesheet" href="css/filter.css">
+<link rel="stylesheet" href="css/nouislider.min.css">
+        <link rel="stylesheet" href="css/leaflet.photon.css">
+        <style>
+        html, body, #map {
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+        }
+        .map-logo { position: absolute; bottom: 20px; /* Distancia desde abajo */ left: 20px; /* Distancia desde la izquierda */ z-index: 1000; /* Lo mantiene sobre el mapa */ pointer-events: none; /* Permite hacer click a través del logo */ 
+} 
+.map-logo img { height: 60px; /* Ajusta el tamaño de tu logo */ width: auto; }
+
+        </style>
+        
+        <title>Trabajos realizado con máquinas. GYRSAU. </title>
+    </head>
+    <body>
+        <div class="map-logo"> <img src="images/Logo.jpg" alt="Logo"> </div>
+        <div id="map">
+        </div>
+        <script src="js/qgis2web_expressions.js"></script>
+        <script src="js/leaflet.js"></script>
+        <script src="js/L.Control.Layers.Tree.min.js"></script>
+        <script src="js/multi-style-layer.js"></script>
+        <script src="js/leaflet.rotatedMarker.js"></script>
+        <script src="js/leaflet.pattern.js"></script>
+        <script src="js/leaflet-hash.js"></script>
+        <script src="js/Autolinker.min.js"></script>
+        <script src="js/rbush.min.js"></script>
+        <script src="js/labelgun.min.js"></script>
+        <script src="js/labels.js"></script>
+        <script src="js/leaflet.photon.js"></script>
+        <script src="js/tailDT.js"></script>
+<script src="js/nouislider.min.js"></script>
+<script src="js/wNumb.js"></script>
+        <script src="data/Lmiteprovincial_1.js"></script>
+        <script src="data/Trabajosrealizadosconmquinas_2.js"></script>
+        <script src="data/Trabajosrealizadosconmquina_3.js"></script>
+        <script>
+        var highlightLayer;
+        function highlightFeature(e) {
+            highlightLayer = e.target;
+
+            if (e.target.feature.geometry.type === 'LineString' || e.target.feature.geometry.type === 'MultiLineString') {
+              highlightLayer.setStyle({
+                color: 'rgba(255, 255, 0, 1.00)',
+              });
+            } else {
+              highlightLayer.setStyle({
+                fillColor: 'rgba(255, 255, 0, 1.00)',
+                fillOpacity: 1
+              });
+            }
+            highlightLayer.openPopup();
+        }
+        var map = L.map('map', {
+            zoomControl:false, maxZoom:26, minZoom:1
+        }).fitBounds([[-40.101626486315844,-69.34010409001112],[-37.864112850407274,-63.436381033090655]]);
+        var hash = new L.Hash(map);
+        map.attributionControl.setPrefix('<a href="https://github.com/qgis2web/qgis2web" target="_blank">qgis2web</a> &middot; <a href="https://leafletjs.com" title="A JS library for interactive maps">Leaflet</a> &middot; <a href="https://qgis.org">QGIS</a>');
+        var autolinker = new Autolinker({truncate: {length: 30, location: 'smart'}});
+        // remove popup's row if "visible-with-data"
+        function removeEmptyRowsFromPopupContent(content, feature) {
+         var tempDiv = document.createElement('div');
+         tempDiv.innerHTML = content;
+         var rows = tempDiv.querySelectorAll('tr');
+         for (var i = 0; i < rows.length; i++) {
+             var td = rows[i].querySelector('td.visible-with-data');
+             var key = td ? td.id : '';
+             if (td && td.classList.contains('visible-with-data') && feature.properties[key] == null) {
+                 rows[i].parentNode.removeChild(rows[i]);
+             }
+         }
+         return tempDiv.innerHTML;
+        }
+        // modify popup if contains media
+        function addClassToPopupIfMedia(content, popup) {
+            var tempDiv = document.createElement('div');
+            tempDiv.innerHTML = content;
+            var imgTd = tempDiv.querySelector('td img');
+            if (imgTd) {
+                var src = imgTd.getAttribute('src');
+                if (/\.(jpg|jpeg|png|gif|bmp|webp|avif)$/i.test(src)) {
+                    popup._contentNode.classList.add('media');
+                    setTimeout(function() {
+                        popup.update();
+                    }, 10);
+                } else if (/\.(mp3|wav|ogg|aac)$/i.test(src)) {
+                    var audio = document.createElement('audio');
+                    audio.controls = true;
+                    audio.src = src;
+                    imgTd.parentNode.replaceChild(audio, imgTd);
+                    popup._contentNode.classList.add('media');
+                    setTimeout(function() {
+                        popup.setContent(tempDiv.innerHTML);
+                        popup.update();
+                    }, 10);
+                } else if (/\.(mp4|webm|ogg|mov)$/i.test(src)) {
+                    var video = document.createElement('video');
+                    video.controls = true;
+                    video.src = src;
+                    video.style.width = "400px";
+                    video.style.height = "300px";
+                    video.style.maxHeight = "60vh";
+                    video.style.maxWidth = "60vw";
+                    imgTd.parentNode.replaceChild(video, imgTd);
+                    popup._contentNode.classList.add('media');
+                    // Aggiorna il popup quando il video carica i metadati
+                    video.addEventListener('loadedmetadata', function() {
+                        popup.update();
+                    });
+                    setTimeout(function() {
+                        popup.setContent(tempDiv.innerHTML);
+                        popup.update();
+                    }, 10);
+                } else {
+                    popup._contentNode.classList.remove('media');
+                }
+            } else {
+                popup._contentNode.classList.remove('media');
+            }
+        }
+        var title = new L.Control({'position':'topright'});
+        title.onAdd = function (map) {
+            this._div = L.DomUtil.create('div', 'info');
+            this.update();
+            return this._div;
+        };
+        title.update = function () {
+            this._div.innerHTML = '<h2>Trabajos realizado con máquinas. GYRSAU. </h2>';
+        };
+        title.addTo(map);
+        var abstract = new L.Control({'position':'topright'});
+        abstract.onAdd = function (map) {
+            this._div = L.DomUtil.create('div',
+            'leaflet-control abstract');
+            this._div.id = 'abstract'
+
+                abstract.show();
+                return this._div;
+            };
+            abstract.show = function () {
+                this._div.classList.remove("abstract");
+                this._div.classList.add("abstractUncollapsed");
+                this._div.innerHTML = 'Versión 9.06.26. ';
+        };
+        abstract.addTo(map);
+        var zoomControl = L.control.zoom({
+            position: 'topleft'
+        }).addTo(map);
+        var bounds_group = new L.featureGroup([]);
+        function setBounds() {
+        }
+        map.createPane('pane_GoogleSatellite_0');
+        map.getPane('pane_GoogleSatellite_0').style.zIndex = 400;
+        var layer_GoogleSatellite_0 = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+            pane: 'pane_GoogleSatellite_0',
+            opacity: 1.0,
+            attribution: '<a href="https://www.google.at/permissions/geoguidelines/attr-guide.html">Map data ©2015 Google</a>',
+            minZoom: 1,
+            maxZoom: 26,
+            minNativeZoom: 0,
+            maxNativeZoom: 20
+        });
+        layer_GoogleSatellite_0;
+        map.addLayer(layer_GoogleSatellite_0);
+        function pop_Lmiteprovincial_1(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    for (var i in e.target._eventParents) {
+                        if (typeof e.target._eventParents[i].resetStyle === 'function') {
+                            e.target._eventParents[i].resetStyle(e.target);
+                        }
+                    }
+                    if (typeof layer.closePopup == 'function') {
+                        layer.closePopup();
+                    } else {
+                        layer.eachLayer(function(feature){
+                            feature.closePopup()
+                        });
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['gid'] !== null ? autolinker.link(String(feature.properties['gid']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['entidad'] !== null ? autolinker.link(String(feature.properties['entidad']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fna'] !== null ? autolinker.link(String(feature.properties['fna']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['gna'] !== null ? autolinker.link(String(feature.properties['gna']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['nam'] !== null ? autolinker.link(String(feature.properties['nam']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['in1'] !== null ? autolinker.link(String(feature.properties['in1']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fdc'] !== null ? autolinker.link(String(feature.properties['fdc']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['sag'] !== null ? autolinker.link(String(feature.properties['sag']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Lmiteprovincial_1_0() {
+            return {
+                pane: 'pane_Lmiteprovincial_1',
+                opacity: 1,
+                color: 'rgba(255,230,1,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 4.0,
+                fillOpacity: 0,
+                interactive: false,
+            }
+        }
+        map.createPane('pane_Lmiteprovincial_1');
+        map.getPane('pane_Lmiteprovincial_1').style.zIndex = 401;
+        map.getPane('pane_Lmiteprovincial_1').style['mix-blend-mode'] = 'normal';
+        var layer_Lmiteprovincial_1 = new L.geoJson(json_Lmiteprovincial_1, {
+            attribution: '',
+            interactive: false,
+            dataVar: 'json_Lmiteprovincial_1',
+            layerName: 'layer_Lmiteprovincial_1',
+            pane: 'pane_Lmiteprovincial_1',
+            onEachFeature: pop_Lmiteprovincial_1,
+            style: style_Lmiteprovincial_1_0,
+        });
+        bounds_group.addLayer(layer_Lmiteprovincial_1);
+        map.addLayer(layer_Lmiteprovincial_1);
+        function pop_Trabajosrealizadosconmquinas_2(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    for (var i in e.target._eventParents) {
+                        if (typeof e.target._eventParents[i].resetStyle === 'function') {
+                            e.target._eventParents[i].resetStyle(e.target);
+                        }
+                    }
+                    if (typeof layer.closePopup == 'function') {
+                        layer.closePopup();
+                    } else {
+                        layer.eachLayer(function(feature){
+                            feature.closePopup()
+                        });
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <th scope="row">DESCRIPCIÓN DEL TRABAJO</th>\
+                        <td>' + (feature.properties['DESCRIPCIO'] !== null ? autolinker.link(String(feature.properties['DESCRIPCIO']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Maquinaria</th>\
+                        <td>' + (feature.properties['MAQUINA'] !== null ? autolinker.link(String(feature.properties['MAQUINA']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Estructura</th>\
+                        <td>' + (feature.properties['ESTRUCTURA'] !== null ? autolinker.link(String(feature.properties['ESTRUCTURA']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Fecha de inicio</th>\
+                        <td>' + (feature.properties['FECH INCIO'] !== null ? autolinker.link(String(feature.properties['FECH INCIO']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Fecha de finalización</th>\
+                        <td>' + (feature.properties['FECH FINAL'] !== null ? autolinker.link(String(feature.properties['FECH FINAL']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Destino</th>\
+                        <td>' + (feature.properties['DESTINO'] !== null ? autolinker.link(String(feature.properties['DESTINO']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Lugar</th>\
+                        <td>' + (feature.properties['LUGAR'] !== null ? autolinker.link(String(feature.properties['LUGAR']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Foto</th>\
+                        <td>' + (feature.properties['Imagen'] !== null ? '<img src="images/' + String(feature.properties['Imagen']).replace(/[\\/:]/g, '_').trim().replace(/'/g, '\'').replace(/"/g, '&quot;') + '">' : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Días hábiles</th>\
+                        <td>' + (feature.properties['Dias'] !== null ? autolinker.link(String(feature.properties['Dias']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Trabajosrealizadosconmquinas_2_0(feature) {
+            switch(String(feature.properties['MAQUINA'])) {
+                case 'Excavadora Volvo EC210 DLR':
+                    return {
+                pane: 'pane_Trabajosrealizadosconmquinas_2',
+                radius: 6.4,
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(46,82,200,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Reropala MST 542 S':
+                    return {
+                pane: 'pane_Trabajosrealizadosconmquinas_2',
+                radius: 6.4,
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(200,173,84,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Retropala MST-Camion Iveco':
+                    return {
+                pane: 'pane_Trabajosrealizadosconmquinas_2',
+                radius: 6.4,
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(88,201,54,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Topadora NH':
+                    return {
+                pane: 'pane_Trabajosrealizadosconmquinas_2',
+                radius: 6.4,
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(102,205,181,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Camión volcador Iveco':
+                    return {
+                pane: 'pane_Trabajosrealizadosconmquinas_2',
+                radius: 6.4,
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(197,117,206,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Excavadora Hyundai 210':
+                    return {
+                pane: 'pane_Trabajosrealizadosconmquinas_2',
+                radius: 6.4,
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(68,240,194,1.0)',
+                interactive: true,
+            }
+                    break;
+                default:
+                    return {
+                pane: 'pane_Trabajosrealizadosconmquinas_2',
+                radius: 6.4,
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(196,64,61,1.0)',
+                interactive: true,
+            }
+                    break;
+            }
+        }
+        function style_Trabajosrealizadosconmquinas_2_1(feature) {
+            switch(String(feature.properties['MAQUINA'])) {
+                case 'Excavadora Volvo EC210 DLR':
+                    return {
+                pane: 'pane_Trabajosrealizadosconmquinas_2',
+                radius: 1.4,
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 2.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(46,82,200,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Reropala MST 542 S':
+                    return {
+                pane: 'pane_Trabajosrealizadosconmquinas_2',
+                radius: 1.4,
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 2.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(200,173,84,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Retropala MST-Camion Iveco':
+                    return {
+                pane: 'pane_Trabajosrealizadosconmquinas_2',
+                radius: 1.4,
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 2.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(88,201,54,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Topadora NH':
+                    return {
+                pane: 'pane_Trabajosrealizadosconmquinas_2',
+                radius: 1.4,
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 2.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(102,205,181,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Camión volcador Iveco':
+                    return {
+                pane: 'pane_Trabajosrealizadosconmquinas_2',
+                radius: 1.4,
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 2.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(197,117,206,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Excavadora Hyundai 210':
+                    return {
+                pane: 'pane_Trabajosrealizadosconmquinas_2',
+                radius: 1.4,
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 2.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(68,240,194,1.0)',
+                interactive: true,
+            }
+                    break;
+                default:
+                    return {
+                pane: 'pane_Trabajosrealizadosconmquinas_2',
+                radius: 1.4,
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 2.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(196,64,61,1.0)',
+                interactive: true,
+            }
+                    break;
+            }
+        }
+        map.createPane('pane_Trabajosrealizadosconmquinas_2');
+        map.getPane('pane_Trabajosrealizadosconmquinas_2').style.zIndex = 402;
+        map.getPane('pane_Trabajosrealizadosconmquinas_2').style['mix-blend-mode'] = 'normal';
+        var layer_Trabajosrealizadosconmquinas_2 = new L.geoJson.multiStyle(json_Trabajosrealizadosconmquinas_2, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_Trabajosrealizadosconmquinas_2',
+            layerName: 'layer_Trabajosrealizadosconmquinas_2',
+            pane: 'pane_Trabajosrealizadosconmquinas_2',
+            onEachFeature: pop_Trabajosrealizadosconmquinas_2,
+            pointToLayers: [function (feature, latlng) {
+                var context = {
+                    feature: feature,
+                    variables: {}
+                };
+                return L.circleMarker(latlng, style_Trabajosrealizadosconmquinas_2_0(feature));
+            },function (feature, latlng) {
+                var context = {
+                    feature: feature,
+                    variables: {}
+                };
+                return L.circleMarker(latlng, style_Trabajosrealizadosconmquinas_2_1(feature));
+            },
+        ]});
+        bounds_group.addLayer(layer_Trabajosrealizadosconmquinas_2);
+        map.addLayer(layer_Trabajosrealizadosconmquinas_2);
+        function pop_Trabajosrealizadosconmquina_3(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    for (var i in e.target._eventParents) {
+                        if (typeof e.target._eventParents[i].resetStyle === 'function') {
+                            e.target._eventParents[i].resetStyle(e.target);
+                        }
+                    }
+                    if (typeof layer.closePopup == 'function') {
+                        layer.closePopup();
+                    } else {
+                        layer.eachLayer(function(feature){
+                            feature.closePopup()
+                        });
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <th scope="row">DESCRIPCIÓN DEL TRABAJO</th>\
+                        <td>' + (feature.properties['DESCRIPCIO'] !== null ? autolinker.link(String(feature.properties['DESCRIPCIO']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Maquinaria</th>\
+                        <td>' + (feature.properties['MAQUINARIA'] !== null ? autolinker.link(String(feature.properties['MAQUINARIA']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Estructura</th>\
+                        <td>' + (feature.properties['Estruc'] !== null ? autolinker.link(String(feature.properties['Estruc']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Fecha de incio</th>\
+                        <td>' + (feature.properties['FECH INCIO'] !== null ? autolinker.link(String(feature.properties['FECH INCIO']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Fecha de finalización</th>\
+                        <td>' + (feature.properties['FECHA FINA'] !== null ? autolinker.link(String(feature.properties['FECHA FINA']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Lugar</th>\
+                        <td>' + (feature.properties['EJIDO'] !== null ? autolinker.link(String(feature.properties['EJIDO']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Destino</th>\
+                        <td>' + (feature.properties['DESTINO'] !== null ? autolinker.link(String(feature.properties['DESTINO']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Foto</th>\
+                        <td>' + (feature.properties['Imagen'] !== null ? '<img src="images/' + String(feature.properties['Imagen']).replace(/[\\/:]/g, '_').trim().replace(/'/g, '\'').replace(/"/g, '&quot;') + '">' : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Dias'] !== null ? autolinker.link(String(feature.properties['Dias']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Trabajosrealizadosconmquina_3_0(feature) {
+            switch(String(feature.properties['MAQUINARIA'])) {
+                case 'Camión volcador Iveco':
+                    return {
+                pane: 'pane_Trabajosrealizadosconmquina_3',
+                opacity: 1,
+                color: 'rgba(148,212,76,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 4.0,
+                fillOpacity: 0,
+                interactive: true,
+            }
+                    break;
+                case 'Excavadora Hyundai 210':
+                    return {
+                pane: 'pane_Trabajosrealizadosconmquina_3',
+                opacity: 1,
+                color: 'rgba(71,194,221,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 4.0,
+                fillOpacity: 0,
+                interactive: true,
+            }
+                    break;
+                case 'Excavadora Volvo EC210 DLR':
+                    return {
+                pane: 'pane_Trabajosrealizadosconmquina_3',
+                opacity: 1,
+                color: 'rgba(198,94,212,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 4.0,
+                fillOpacity: 0,
+                interactive: true,
+            }
+                    break;
+                case 'Reropala MST 542 S':
+                    return {
+                pane: 'pane_Trabajosrealizadosconmquina_3',
+                opacity: 1,
+                color: 'rgba(224,44,89,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 4.0,
+                fillOpacity: 0,
+                interactive: true,
+            }
+                    break;
+                case 'Topadora Caterpillar D7':
+                    return {
+                pane: 'pane_Trabajosrealizadosconmquina_3',
+                opacity: 1,
+                color: 'rgba(134,131,227,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 4.0,
+                fillOpacity: 0,
+                interactive: true,
+            }
+                    break;
+                case 'Topadora New Holland 180 C':
+                    return {
+                pane: 'pane_Trabajosrealizadosconmquina_3',
+                opacity: 1,
+                color: 'rgba(71,212,115,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 4.0,
+                fillOpacity: 0,
+                interactive: true,
+            }
+                    break;
+            }
+        }
+        map.createPane('pane_Trabajosrealizadosconmquina_3');
+        map.getPane('pane_Trabajosrealizadosconmquina_3').style.zIndex = 403;
+        map.getPane('pane_Trabajosrealizadosconmquina_3').style['mix-blend-mode'] = 'normal';
+        var layer_Trabajosrealizadosconmquina_3 = new L.geoJson(json_Trabajosrealizadosconmquina_3, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_Trabajosrealizadosconmquina_3',
+            layerName: 'layer_Trabajosrealizadosconmquina_3',
+            pane: 'pane_Trabajosrealizadosconmquina_3',
+            onEachFeature: pop_Trabajosrealizadosconmquina_3,
+            style: style_Trabajosrealizadosconmquina_3_0,
+        });
+        bounds_group.addLayer(layer_Trabajosrealizadosconmquina_3);
+        map.addLayer(layer_Trabajosrealizadosconmquina_3);
+        const url = {"Nominatim OSM": "https://nominatim.openstreetmap.org/search?format=geojson&addressdetails=1&",
+        "France BAN": "https://api-adresse.data.gouv.fr/search/?"}
+        var photonControl = L.control.photon({
+            url: url["Nominatim OSM"],
+            feedbackLabel: '',
+            position: 'topleft',
+            includePosition: true,
+            initial: true,
+            // resultsHandler: myHandler,
+        }).addTo(map);
+        photonControl._container.childNodes[0].style.borderRadius="10px"
+        // Create a variable to store the geoJSON data
+        var x = null;
+        // Create a variable to store the marker
+        var marker = null;
+        // Add an event listener to the Photon control to create a marker from the returned geoJSON data
+        var z = null;
+        photonControl.on('selected', function(e) {
+            console.log(photonControl.search.resultsContainer);
+            if (x != null) {
+                map.removeLayer(obj3.marker);
+                map.removeLayer(x);
+            }
+            obj2.gcd = e.choice;
+            x = L.geoJSON(obj2.gcd).addTo(map);
+            var label = typeof obj2.gcd.properties.label === 'undefined' ? obj2.gcd.properties.display_name : obj2.gcd.properties.label;
+            obj3.marker = L.marker(x.getLayers()[0].getLatLng()).bindPopup(label).addTo(map);
+            map.setView(x.getLayers()[0].getLatLng(), 17);
+            z = typeof e.choice.properties.label === 'undefined'? e.choice.properties.display_name : e.choice.properties.label;
+            console.log(e);
+            e.target.input.value = z;
+        });
+        var search = document.getElementsByClassName("leaflet-photon leaflet-control")[0];
+        search.classList.add("leaflet-control-search")
+        search.style.display = "flex";
+        search.style.backgroundColor="rgba(255,255,255,0.5)" 
+
+        // Create the new button element
+        var button = document.createElement("div");
+        button.id = "gcd-button-control";
+        button.className = "gcd-gl-btn fa fa-search search-button";
+
+        // Insert the button at the beginning of the search control
+        search.insertBefore(button, search.firstChild);
+        last = search.lastChild;
+        last.style.display = "none";
+        button.addEventListener("click", function (e) {
+            if (last.style.display === "none") {
+                last.style.display = "block";
+            } else {
+                last.style.display = "none";
+            }
+        });
+        var overlaysTree = [
+            {label: 'Trabajos realizados con máquina<br /><table><tr><td style="text-align: center;"><img src="legend/Trabajosrealizadosconmquina_3_CamiónvolcadorIveco0.png" /></td><td>Camión volcador Iveco</td></tr><tr><td style="text-align: center;"><img src="legend/Trabajosrealizadosconmquina_3_ExcavadoraHyundai2101.png" /></td><td>Excavadora Hyundai 210</td></tr><tr><td style="text-align: center;"><img src="legend/Trabajosrealizadosconmquina_3_ExcavadoraVolvoEC210DLR2.png" /></td><td>Excavadora Volvo EC210 DLR</td></tr><tr><td style="text-align: center;"><img src="legend/Trabajosrealizadosconmquina_3_ReropalaMST542S3.png" /></td><td>Reropala MST 542 S</td></tr><tr><td style="text-align: center;"><img src="legend/Trabajosrealizadosconmquina_3_TopadoraCaterpillarD74.png" /></td><td>Topadora Caterpillar D7</td></tr><tr><td style="text-align: center;"><img src="legend/Trabajosrealizadosconmquina_3_TopadoraNewHolland180C5.png" /></td><td>Topadora New Holland 180 C</td></tr></table>', layer: layer_Trabajosrealizadosconmquina_3},
+            {label: 'Trabajos realizados con máquinas<br /><table><tr><td style="text-align: center;"><img src="legend/Trabajosrealizadosconmquinas_2_ExcavadoraVolvoEC210DLR0.png" /></td><td>Excavadora Volvo EC210 DLR</td></tr><tr><td style="text-align: center;"><img src="legend/Trabajosrealizadosconmquinas_2_ReropalaMST542S1.png" /></td><td>Reropala MST 542 S</td></tr><tr><td style="text-align: center;"><img src="legend/Trabajosrealizadosconmquinas_2_RetropalaMSTCamionIveco2.png" /></td><td>(Retropala MST-Camion Iveco)</td></tr><tr><td style="text-align: center;"><img src="legend/Trabajosrealizadosconmquinas_2_TopadoraNH3.png" /></td><td>(Topadora NH)</td></tr><tr><td style="text-align: center;"><img src="legend/Trabajosrealizadosconmquinas_2_CamiónvolcadorIveco4.png" /></td><td>Camión volcador Iveco</td></tr><tr><td style="text-align: center;"><img src="legend/Trabajosrealizadosconmquinas_2_ExcavadoraHyundai2105.png" /></td><td>Excavadora Hyundai 210</td></tr><tr><td style="text-align: center;"><img src="legend/Trabajosrealizadosconmquinas_2_6.png" /></td><td></td></tr></table>', layer: layer_Trabajosrealizadosconmquinas_2},
+            {label: '<img src="legend/Lmiteprovincial_1.png" /> Límite provincial', layer: layer_Lmiteprovincial_1},
+            {label: "Google Satellite", layer: layer_GoogleSatellite_0},]
+        var lay = L.control.layers.tree(null, overlaysTree,{
+            //namedToggle: true,
+            //selectorBack: false,
+            //closedSymbol: '&#8862; &#x1f5c0;',
+            //openedSymbol: '&#8863; &#x1f5c1;',
+            //collapseAll: 'Collapse all',
+            //expandAll: 'Expand all',
+            collapsed: true,
+        });
+        lay.addTo(map);
+        setBounds();
+        var mapDiv = document.getElementById('map');
+        var row = document.createElement('div');
+        row.className="row";
+        row.id="all";
+        row.style.height = "100%";
+        var col1 = document.createElement('div');
+        col1.className="col9";
+        col1.id = "mapWindow";
+        col1.style.height = "99%";
+        col1.style.width = "80%";
+        col1.style.display = "inline-block";
+        var col2 = document.createElement('div');
+        col2.className="col3";
+        col2.id = "menu";
+        col2.style.display = "inline-block";
+        mapDiv.parentNode.insertBefore(row, mapDiv);
+        document.getElementById("all").appendChild(col1);
+        document.getElementById("all").appendChild(col2);
+        col1.appendChild(mapDiv)
+        var Filters = {"MAQUINARIA": "str"};
+        function filterFunc() {
+          map.eachLayer(function(lyr){
+          if ("options" in lyr && "dataVar" in lyr["options"]){
+            features = this[lyr["options"]["dataVar"]].features.slice(0);
+            try{
+              for (key in Filters){
+                keyS = key.replace(/[^a-zA-Z0-9_]/g, "")
+                if (Filters[key] == "str" || Filters[key] == "bool"){
+                  var selection = [];
+                  var options = document.getElementById("sel_" + keyS).options
+                  for (var i=0; i < options.length; i++) {
+                    if (options[i].selected) selection.push(options[i].value);
+                  }
+                    try{
+                      if (key in features[0].properties){
+                        for (i = features.length - 1;
+                          i >= 0; --i){
+                          if (selection.indexOf(
+                          features[i].properties[key])<0
+                          && selection.length>0) {
+                          features.splice(i,1);
+                          }
+                        }
+                      }
+                    } catch(err){
+                  }
+                }
+                if (Filters[key] == "int"){
+                  sliderVals =  document.getElementById(
+                    "div_" + keyS).noUiSlider.get();
+                  try{
+                    if (key in features[0].properties){
+                    for (i = features.length - 1; i >= 0; --i){
+                      if (parseInt(features[i].properties[key])
+                          < sliderVals[0]
+                          || parseInt(features[i].properties[key])
+                          > sliderVals[1]){
+                            features.splice(i,1);
+                          }
+                        }
+                      }
+                    } catch(err){
+                    }
+                  }
+                if (Filters[key] == "real"){
+                  sliderVals =  document.getElementById(
+                    "div_" + keyS).noUiSlider.get();
+                  try{
+                    if (key in features[0].properties){
+                    for (i = features.length - 1; i >= 0; --i){
+                      if (features[i].properties[key]
+                          < sliderVals[0]
+                          || features[i].properties[key]
+                          > sliderVals[1]){
+                            features.splice(i,1);
+                          }
+                        }
+                      }
+                    } catch(err){
+                    }
+                  }
+                if (Filters[key] == "date"
+                  || Filters[key] == "datetime"
+                  || Filters[key] == "time"){
+                  try{
+                    if (key in features[0].properties){
+                      HTMLkey = key.replace(/[&\/\\#,+()$~%.'":*?<>{} ]/g, '');
+                      startdate = document.getElementById("dat_" +
+                        HTMLkey + "_date1").value.replace(" ", "T");
+                      enddate = document.getElementById("dat_" +
+                        HTMLkey + "_date2").value.replace(" ", "T");
+                      for (i = features.length - 1; i >= 0; --i){
+                        if (features[i].properties[key] < startdate
+                          || features[i].properties[key] > enddate){
+                          features.splice(i,1);
+                        }
+                      }
+                    }
+                  } catch(err){
+                  }
+                }
+              }
+            } catch(err){
+            }
+          this[lyr["options"]["layerName"]].clearLayers();
+          this[lyr["options"]["layerName"]].addData(features);
+          }
+          })
+        }
+            document.getElementById("menu").appendChild(
+                document.createElement("div"));
+            var div_MAQUINARIA = document.createElement('div');
+            div_MAQUINARIA.id = "div_MAQUINARIA";
+            div_MAQUINARIA.className= "filterselect";
+            document.getElementById("menu").appendChild(div_MAQUINARIA);
+            sel_MAQUINARIA = document.createElement('select');
+            sel_MAQUINARIA.multiple = true;
+            sel_MAQUINARIA.size = 6;
+            sel_MAQUINARIA.id = "sel_MAQUINARIA";
+            var MAQUINARIA_options_str = "<option value='' unselected></option>";
+            sel_MAQUINARIA.onchange = function(){filterFunc()};
+            MAQUINARIA_options_str  += '<option value="Camión volcador Iveco">Camión volcador Iveco</option>';
+            MAQUINARIA_options_str  += '<option value="Excavadora Hyundai 210">Excavadora Hyundai 210</option>';
+            MAQUINARIA_options_str  += '<option value="Excavadora Volvo EC210 DLR">Excavadora Volvo EC210 DLR</option>';
+            MAQUINARIA_options_str  += '<option value="Reropala MST 542 S">Reropala MST 542 S</option>';
+            MAQUINARIA_options_str  += '<option value="Topadora Caterpillar D7">Topadora Caterpillar D7</option>';
+            MAQUINARIA_options_str  += '<option value="Topadora New Holland 180 C">Topadora New Holland 180 C</option>';
+            sel_MAQUINARIA.innerHTML = MAQUINARIA_options_str;
+            div_MAQUINARIA.appendChild(sel_MAQUINARIA);
+            var lab_MAQUINARIA = document.createElement('div');
+            lab_MAQUINARIA.innerHTML = 'MAQUINARIA';
+            lab_MAQUINARIA.className = 'filterlabel';
+            div_MAQUINARIA.appendChild(lab_MAQUINARIA);
+            var reset_MAQUINARIA = document.createElement('div');
+            reset_MAQUINARIA.innerHTML = 'clear filter';
+            reset_MAQUINARIA.className = 'filterlabel';
+            reset_MAQUINARIA.onclick = function() {
+                var options = document.getElementById("sel_MAQUINARIA").options;
+                for (var i=0; i < options.length; i++) {
+                    options[i].selected = false;
+                }
+                filterFunc();
+            };
+            div_MAQUINARIA.appendChild(reset_MAQUINARIA);
+        </script>        
+    </body>
+</html>
